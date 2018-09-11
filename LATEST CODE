@@ -1,65 +1,79 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Sep  3 15:16:43 2018
+Created on Sun Sep  9 12:11:20 2018
 
-@author: vuppuluri
+@author: Venkat Durga Rao
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Sep  3 11:13:06 2018
-
-@author: vuppuluri
-"""
-
-import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as pt
 import os
 from collections import Counter
+import seaborn as sns  
+from sklearn import tree
 from sklearn import model_selection
-import seaborn as sns
-# Input data files are available in the "../input/" directory.
-# For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory
-
-
-##print(os.listdir("../input"))
-from sklearn.ensemble import RandomForestClassifier
+from collections import Counter
 from sklearn import preprocessing
-# Any results you write to the current directory are saved as output.
-os.chdir("D:\Data Science\costatica_poverty_class")
 
-##os.chdir("../input")    ## if you using kaggle
-train=pd.read_csv('train.csv')
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, ExtraTreesClassifier, VotingClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
+from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold, learning_curve
+
+
+
+os.chdir("E:\costarica_multiclass_poverty")
+
+print  ('DURGA U ROCKS')
+
+## READ THE TEST & TRAIN DATA
+
+train=pd.read_csv("train.csv")
 test=pd.read_csv("test.csv")
 
-#### impute missing values
+missing_cols=train.columns[train.isna().any()].tolist()
+
+
+#############  IMPUTE MISSING VALUES  #########
+
 train=train.replace({'dependency': 'no','edjefa':'no','edjefe':'no','v18q1': np.nan}, 0)
-train=train.replace({'dependency': 'yes','edjefa':'yes','edjefe':'yes'}, np.nan)
+train=train.replace({'dependency': 'yes'}, np.nan)
+train=train.replace({'edjefa':'yes','edjefe':'yes'},6)
+
+
+
 #train=train.replace({'rez_esc': np.nan}, 100)
 
+train=train.drop(columns=['idhogar','Id'])  ### drop id columns
+train=train.drop(columns=['SQBescolari',	'SQBage',	'SQBhogar_total',	'SQBedjefe',	'SQBhogar_nin',	'SQBovercrowding',	'SQBdependency',	'SQBmeaned','agesq'])  ## these redundant fields and correlated ..hence dropping as part of cleansing
+
+
+###imputation needed for below columns
+ #train['dependency']=train['dependency'].fillna(train['dependency'].dropna().mode()]
+
+
+
+
+train.columns[train.isnull().any()].tolist()  ## find the columns wiht missing values
 
 mean_imputer = preprocessing.Imputer() #By defalut parameter is mean and let it use default one.
-mean_imputer.fit(train[['v2a1','meaneduc','SQBmeaned','dependency','edjefa','edjefe','rez_esc']]) 
-train[['v2a1','meaneduc','SQBmeaned','dependency','edjefa','edjefe','rez_esc']] = mean_imputer.transform(train[['v2a1','meaneduc','SQBmeaned','dependency','edjefa','edjefe','rez_esc']])
+mean_imputer.fit(train[['v2a1','meaneduc','dependency','rez_esc']]) 
+train[['v2a1','meaneduc','dependency','rez_esc']] = mean_imputer.transform(train[['v2a1','meaneduc','dependency','rez_esc']])
 
 
-
-print(np.nan)
 
 #### droping columns with object data type
-x_train=train.drop(columns=['idhogar','Id'])
-x_train=x_train.drop_duplicates()
 
-########## make test dat accommadated with similar changes
-test=test.replace({'dependency': 'no','edjefa':'no','edjefe':'no','v18q1': np.nan}, 0)
-test=test.replace({'dependency': 'yes','edjefa':'yes','edjefe':'yes'}, np.nan)
-mean_imputer = preprocessing.Imputer() #By defalut parameter is mean and let it use default one.
-mean_imputer.fit(test[['v2a1','meaneduc','SQBmeaned','dependency','edjefa','edjefe','rez_esc']]) 
-test[['v2a1','meaneduc','SQBmeaned','dependency','edjefa','edjefe','rez_esc']] = mean_imputer.transform(test[['v2a1','meaneduc','SQBmeaned','dependency','edjefa','edjefe','rez_esc']])
+x_train=train.drop_duplicates()
 
 
-x_test=test.drop(columns=['idhogar','Id'])
 
+x_train.select_dtypes(include=['float64']).columns.tolist()
 
 ############################# DETECT OUTLIERS ############################
 
@@ -97,57 +111,37 @@ def detect_outliers(df,n,features):
     return multiple_outliers   
 
 # detect outliers from all fields
- probable_outliers=x_train.select_dtypes(include=['float64']).columns.tolist()
+    #x_train._get_numeric_data().to_csv("numeric_data.csv")
+#x_train.info()
+probable_outliers=x_train.select_dtypes(include=['float64']).columns.tolist()
 
 Outliers_to_drop = detect_outliers(x_train,2,probable_outliers)
-#Outliers_to_drop = detect_outliers(x_train,12,list(x_train))
 
+
+####################### DROP OUTLIERS#####################
 x_train = x_train.drop(Outliers_to_drop, axis = 0).reset_index(drop=True)
+
 y_train=x_train['Target']
 x_train=x_train.drop(columns=['Target'])
 
-x_train.to_csv("model_input.csv",index=False)
+
+print(len(x_train),len(y_train))
 
 
 
+x_train['age12above']=train['r4h2']+train['r4m2']-train['hogar_mayor']
 
-kfold=model_selection.StratifiedKFold(n_splits=10,random_state=105641)
+x_train['bedrooms_to_rooms'] = x_train['bedrooms']/x_train['rooms']
+    x_train['rent_to_rooms'] = x_train['v2a1']/x_train['rooms']
+    x_train['tamhog_to_rooms'] = x_train['tamhog']/x_train['rooms']
 
+############################################
 
-############ RANDOM FOREST###################3
-
-
-
-
-
-
-rdt=RandomForestClassifier()
-dt_grid = {'max_depth':list(range(9,20)), 'min_samples_split':list(range(9,25)), 'criterion':['gini','entropy']}
-grid_tree_estimator = model_selection.GridSearchCV(rdt,dt_grid,cv=kfold,scoring='f1_macro')
-
-grid_tree_estimator.fit(x_train, y_train)
-
-grid_tree_estimator.best_score_
-
-x_test.to_csv('submission.csv',columns=['Id','Target'],index=False)
-
-#################
-
-rdt=RandomForestClassifier()
-dt_grid = {'max_depth':list(range(3,8)), 'min_samples_split':[2,3,6,7,8], 'criterion':['gini','entropy']}
-grid_tree_estimator = model_selection.GridSearchCV(rdt,dt_grid,cv=kfold,scoring='f1_macro')
-grid_tree_estimator.fit(x_train, y_train)
+dt=tree.DecisionTreeClassifier()
 
 
+kfold=model_selection.StratifiedKFold(n_splits=10,random_state=105646)
 
-
-grid_tree_estimator.best_score_
-
-##,'n_estimators':list(range(50,201,50))
-
-## earlier :65.9
-
-############  CROSS WALK ###################
 random_state = 105678
 classifiers = []
 classifiers.append(SVC(random_state=random_state))
@@ -177,60 +171,91 @@ cv_res = pd.DataFrame({"CrossValMeans":cv_means,"CrossValerrors": cv_std,"Algori
     
 
 print(cv_res)
+############################## RANDOM FOREST #################
 
-##################################
-
-
-
-
-
-
-
-
-
-
-
+rdt=RandomForestClassifier()
+dt_grid = {'max_depth':list(range(9,15)), 'min_samples_split':list(range(11,20)), 'criterion':['gini','entropy']}
+grid_tree_estimator = model_selection.GridSearchCV(rdt,dt_grid,cv=kfold,scoring='f1_macro')
+grid_tree_estimator.fit(x_train, y_train)
+print(grid_tree_estimator.grid_scores_)
+print(grid_tree_estimator.best_score_)    ### so far best 64.59  ### next 82.2  ### 81.9 ## 82.4
+print(grid_tree_estimator.best_params_)
+print(grid_tree_estimator.)
+grid_tree_estimator.cv
 
 
+#################################
+
+train['age12above']=train['r4h2']+train['r4m2']
+x_train['age12above_percent']=((x_train['r4h2']+x_train['r4m2'])/(x_train['r4t3']))*100
+train=train.drop(columns=['age12above_percent'])
+train['age12above_percent']=((train['rooms'])/(train['hhsize']))*100
+
+x_train['age12above']=-1*train['overcrowding']+train['meaneduc']+(-1*train['hogar_nin'])
+
+train=train[train[['hogar_nin']] <=6 &  train[['hogar_adul']] <=7 ]
+
+g = sns.heatmap(x_train[['edjefefa','Target']].corr(),annot=True, fmt = "0.1f", cmap = "coolwarm",linewidths=0.5)
+
+sorted(x_train.hogar_nin.unique())
+z=sorted(x_train.hogar_nin.unique())
+print(type(z))
+g = sns.factorplot(x="hogar_nin",y="Target",data=train,kind="bar", size = 6 ,row_order=sorted(x_train.hogar_nin.unique()) )
+palette = "muted")
+g.despine(left=True)
+g = g.set_ylabels("poverty class")
+
+g = sns.factorplot(x="edjefa",y="Target",data=train,kind="bar", size = 10 , 
+palette = "muted")
+g.despine(left=True)
+g = g.set_ylabels("poverty class")
+
+sns.factorplot()
+
+g = sns.factorplot(x="v2a1",y="Target",data=train,kind="bar", size = 40 , 
+palette = "muted")
+g.despine(left=True)
+g = g.set_ylabels("poverty class")
+
+x_train[['adul_nin']]=x_train.[['hogar_adul']]
+
+sns.countplot(x='hogar_adul',data=train)
 
 
+g = sns.factorplot(x="age12above_percent",y="Target",data=train,kind="bar", size = 20 , 
+palette = "muted")
+g.despine(left=True)
+g = g.set_ylabels("poverty class")
 
 
+sns.countplot(x='edjefa',data=x_train)
+sns.countplot(x='edjefe',data=x_train)
+
+sns.countplot(x='hogar_adul',hue='Target',data=x_train)
+sns.countplot(x='dependency',hue='Target',data=x_train)
+4
+train['edjefe'].value_counts()
+train['edjefa'].value_counts()
+
+sns.distplot(train['edjefe'])
+
+sns.distplot(x_train['v2a1'] ,kde=False)
+sns.distplot(x_train['v2a1'], bins=100, kde=True)
+sns.distplot(train['edjefe'] ,bins=100, kde=False)
+sns.factorplot(x='v2a1',hue='Target',data=train)
 
 
+var1=edjefe
+x_train['edjefe'].dtype
+type(x_train['edjefe'])
+x_train['edjefe']=x_train.edjefe.astype(float)
+x_train['edjefa']=x_train.edjefa.astype(float)
+    x_train['edjefefa']=x_train['edjefe'] + x_train['edjefa']
+g = sns.factorplot(x="edjefefa",y="Target",data=x_train,kind="bar", size = 12 )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#################  EDA WORK #######################
-x_test=test
-
-sns.countplot(x='rez_esc',data=train)
-sns.countplot(x='v18q1',data=x_test)
-
-train[train['dependency']!='yes']['dependency']
-
+type(x_train)
+x_train.to_csv("temp1.csv")
+y=x_train[['edjefa']]
+y.dtypes
 
 
