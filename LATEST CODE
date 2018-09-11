@@ -189,13 +189,13 @@ grid_tree_estimator.cv
 train['age12above']=train['r4h2']+train['r4m2']
 x_train['age12above_percent']=((x_train['r4h2']+x_train['r4m2'])/(x_train['r4t3']))*100
 train=train.drop(columns=['age12above_percent'])
-train['age12above_percent']=((train['rooms'])/(train['hhsize']))*100
+x_train['perhead_sqft']=((x_train['rooms'])/(x_train['hhsize']))*100
 
 x_train['age12above']=-1*train['overcrowding']+train['meaneduc']+(-1*train['hogar_nin'])
 
 train=train[train[['hogar_nin']] <=6 &  train[['hogar_adul']] <=7 ]
 
-g = sns.heatmap(x_train[['edjefefa','Target']].corr(),annot=True, fmt = "0.1f", cmap = "coolwarm",linewidths=0.5)
+g = sns.heatmap(train[['perhead_sqft','Target']].corr(),annot=True, fmt = "0.1f", cmap = "coolwarm",linewidths=0.5)
 
 sorted(x_train.hogar_nin.unique())
 z=sorted(x_train.hogar_nin.unique())
@@ -234,7 +234,7 @@ sns.countplot(x='edjefe',data=x_train)
 sns.countplot(x='hogar_adul',hue='Target',data=x_train)
 sns.countplot(x='dependency',hue='Target',data=x_train)
 4
-train['edjefe'].value_counts()
+train['dependency'].value_counts()
 train['edjefa'].value_counts()
 
 sns.distplot(train['edjefe'])
