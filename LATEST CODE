@@ -36,7 +36,7 @@ print  ('DURGA U ROCKS')
 train=pd.read_csv("train.csv")
 test=pd.read_csv("test.csv")
 
-missing_cols=train.columns[train.isna().any()].tolist()
+missing_cols=x_train.columns[x_train.isna().any()].tolist()
 
 
 #############  IMPUTE MISSING VALUES  #########
@@ -46,7 +46,7 @@ train=train.replace({'dependency': 'yes'}, np.nan)
 train=train.replace({'edjefa':'yes','edjefe':'yes'},6)
 
 
-
+#train.to_csv("temp1.csv")
 #train=train.replace({'rez_esc': np.nan}, 100)
 
 train=train.drop(columns=['idhogar','Id'])  ### drop id columns
@@ -121,19 +121,35 @@ Outliers_to_drop = detect_outliers(x_train,2,probable_outliers)
 ####################### DROP OUTLIERS#####################
 x_train = x_train.drop(Outliers_to_drop, axis = 0).reset_index(drop=True)
 
-y_train=x_train['Target']
-x_train=x_train.drop(columns=['Target'])
 
 
-print(len(x_train),len(y_train))
-
-
-
-x_train['age12above']=train['r4h2']+train['r4m2']-train['hogar_mayor']
+x_train.columns[x_train.isna().any()].tolist()
+x_train.to_csv("temp1.csv")
+x_train['age12above']=x_train['r4h2']+x_train['r4m2']-x_train['hogar_mayor']
 
 x_train['bedrooms_to_rooms'] = x_train['bedrooms']/x_train['rooms']
-    x_train['rent_to_rooms'] = x_train['v2a1']/x_train['rooms']
-    x_train['tamhog_to_rooms'] = x_train['tamhog']/x_train['rooms']
+x_train['rent_to_rooms'] = x_train['v2a1']/x_train['rooms']
+x_train['tamhog_to_rooms'] = x_train['tamhog']/x_train['rooms']
+
+
+
+x_train['age12above_percent']=((x_train['r4h2']+x_train['r4m2'])/(x_train['r4t3']))*100
+
+x_train['perhead_room_size']=((x_train['rooms'])/(x_train['hhsize']))*100
+
+x_train['fancy1']=-1*x_train['overcrowding']+x_train['meaneduc']+(-1*x_train['hogar_nin'])
+
+
+x_train['edjefe']=x_train.edjefe.astype(float)
+x_train['edjefa']=x_train.edjefa.astype(float)
+x_train['edjefefa']=x_train['edjefe'] + x_train['edjefa']
+
+#x_train=x_train[x_train[['hogar_nin']] <=6]
+#x_train=x_train[x_train[['hogar_adul']] <=7 ]
+
+
+y_train=x_train['Target']
+x_train=x_train.drop(columns=['Target'])
 
 ############################################
 
@@ -189,13 +205,13 @@ grid_tree_estimator.cv
 train['age12above']=train['r4h2']+train['r4m2']
 x_train['age12above_percent']=((x_train['r4h2']+x_train['r4m2'])/(x_train['r4t3']))*100
 train=train.drop(columns=['age12above_percent'])
-x_train['perhead_sqft']=((x_train['rooms'])/(x_train['hhsize']))*100
+train['age12above_percent']=((train['rooms'])/(train['hhsize']))*100
 
 x_train['age12above']=-1*train['overcrowding']+train['meaneduc']+(-1*train['hogar_nin'])
 
 train=train[train[['hogar_nin']] <=6 &  train[['hogar_adul']] <=7 ]
 
-g = sns.heatmap(train[['perhead_sqft','Target']].corr(),annot=True, fmt = "0.1f", cmap = "coolwarm",linewidths=0.5)
+g = sns.heatmap(x_train[['edjefefa','Target']].corr(),annot=True, fmt = "0.1f", cmap = "coolwarm",linewidths=0.5)
 
 sorted(x_train.hogar_nin.unique())
 z=sorted(x_train.hogar_nin.unique())
@@ -234,7 +250,7 @@ sns.countplot(x='edjefe',data=x_train)
 sns.countplot(x='hogar_adul',hue='Target',data=x_train)
 sns.countplot(x='dependency',hue='Target',data=x_train)
 4
-train['dependency'].value_counts()
+train['edjefe'].value_counts()
 train['edjefa'].value_counts()
 
 sns.distplot(train['edjefe'])
@@ -250,7 +266,7 @@ x_train['edjefe'].dtype
 type(x_train['edjefe'])
 x_train['edjefe']=x_train.edjefe.astype(float)
 x_train['edjefa']=x_train.edjefa.astype(float)
-    x_train['edjefefa']=x_train['edjefe'] + x_train['edjefa']
+x_train['edjefefa']=x_train['edjefe'] + x_train['edjefa']
 g = sns.factorplot(x="edjefefa",y="Target",data=x_train,kind="bar", size = 12 )
 
 type(x_train)
